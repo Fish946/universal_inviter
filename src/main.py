@@ -2,11 +2,11 @@ import sys
 import asyncio
 import qasync
 from PyQt6.QtWidgets import QApplication
-from ui.main_window import MainWindow
-from utils.config import Config
-from utils.logger import setup_logger
+from src.ui.main_window import MainWindow
+from src.utils.config import Config
+from src.utils.logger import setup_logger
 
-async def main():
+def main():
     # Загружаем конфигурацию
     config = Config.load()
 
@@ -20,12 +20,17 @@ async def main():
     window = MainWindow(config, logger)
     window.show()
 
-    # Запускаем event loop
-    await qasync.QEventLoop(app).exec_()
+    # Создаем и запускаем event loop
+    loop = qasync.QEventLoop(app)
+    asyncio.set_event_loop(loop)
+    
+    # Запускаем приложение
+    with loop:
+        loop.run_forever()
 
 if __name__ == '__main__':
     try:
-        asyncio.run(main())
+        main()
     except Exception as e:
         print(f"Критическая ошибка: {str(e)}")
-        sys.exit(1) 
+        sys.exit(1)

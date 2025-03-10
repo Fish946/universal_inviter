@@ -2,6 +2,7 @@ from typing import List, Dict, Optional, Tuple
 import logging
 from datetime import datetime
 from telethon.errors import *
+from telethon import TelegramClient
 
 from ..utils.database import Database, Account
 from .session_manager import SessionManager
@@ -15,48 +16,46 @@ class AccountManager:
         self.api_checker = APIChecker(logger)
         self.active_accounts: Dict[str, Account] = {}
 
-    async def add_account(self, phone: str, api_id: str, api_hash: str) -> Tuple[bool, str]:
-        """Добавление нового аккаунта"""
+    async def add_account(self, phone: str, api_id: str, api_hash: str, 
+                         code_callback=None, password_callback=None) -> tuple:
         try:
-            # Проверяем, не существует ли уже такой аккаунт
-            existing_accounts = self.db.get_all_accounts()
-            if any(acc.phone == phone for acc in existing_accounts):
-                return False, "Аккаунт с таким номером уже существует"
-
-            # Проверяем API и ограничения
-            check_results = await self.api_checker.check_api(api_id, api_hash, phone)
-            
-            if check_results.get("error"):
-                return False, check_results["error"]
-
-            # Создаем сессию
-            session_string = await self.session_manager.create_session(phone, api_id, api_hash)
-            if not session_string:
-                return False, "Не удалось создать сессию"
-
-            # Создаем новый аккаунт
-            account = Account(
-                id=None,  # ID будет назначен базой данных
-                phone=phone,
-                api_id=api_id,
-                api_hash=api_hash,
-                session_string=session_string,
-                is_active=True,
-                restrictions=check_results
+            client = TelegramClient(
+                f'sessions/{phone}',
+                int(api_id),
+                api_hash
             )
 
-            # Сохраняем в базу
-            account_id = self.db.add_account(account)
-            account.id = account_id
-            self.active_accounts[phone] = account
+            await client.connect()
 
-            self.logger.info(f"Аккаунт {phone} успешно добавлен")
+            if not await client.is_user_authorized():
+                # Отправляем код
+                await client.send_code_request(phone)
+                
+                # Получаем код через колбэк
+                if code_callback:
+                    code = code_callback()
+                    if not code:
+                        return False, "Отменено пользователем"
+                    
+                    try:
+                        # Пытаемся войти с полученным кодом
+                        await client.sign_in(phone, code)
+                    except SessionPasswordNeededError:
+                        # Если требуется 2FA
+                        if password_callback:
+                            password = password_callback()
+                            if not password:
+                                return False, "Отменено пользователем"
+                            await client.sign_in(password=password)
+                        else:
+                            return False, "Требуется пароль двухфакторной аутентификации"
+
+            # Сохраняем данные аккаунта
+            await self.db.add_account(phone, api_id, api_hash)
             return True, "Аккаунт успешно добавлен"
 
         except Exception as e:
-            error_msg = f"Ошибка при добавлении аккаунта: {str(e)}"
-            self.logger.error(error_msg)
-            return False, error_msg
+            return False, str(e)
 
     async def load_accounts(self) -> Tuple[int, int]:
         """Загрузка всех аккаунтов из базы и проверка их состояния"""

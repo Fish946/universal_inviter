@@ -1,14 +1,16 @@
+from PyQt6.QtWidgets import QDialog
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                            QPushButton, QLabel, QLineEdit, QTextEdit, QTabWidget,
-                           QFileDialog, QMessageBox, QProgressBar, QScrollArea)
+                           QFileDialog, QMessageBox, QProgressBar, QScrollArea,
+                           QGridLayout, QDialog)  # добавили QGridLayout и QDialog
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PyQt6.QtGui import QIcon
 
-from .styles import Colors, Styles, Fonts
-from ..core.account_manager import AccountManager
-from ..core.inviter import Inviter
-from ..utils.validators import Validators
-from ..utils.file_handler import FileHandler
+from src.ui.styles import Colors, Styles, Fonts
+from src.core.account_manager import AccountManager
+from src.core.inviter import Inviter
+from src.utils.validators import Validators
+from src.utils.file_handler import FileHandler
 
 class MainWindow(QMainWindow):
     def __init__(self, config, logger):
@@ -218,7 +220,14 @@ class MainWindow(QMainWindow):
                 return
 
         try:
-            success, message = await self.account_manager.add_account(phone, api_id, api_hash)
+            # Передаем колбэки для обработки кодов
+            success, message = await self.account_manager.add_account(
+                phone, 
+                api_id, 
+                api_hash,
+                code_callback=self.show_code_dialog,
+                password_callback=self.show_2fa_dialog
+            )
             
             if success:
                 QMessageBox.information(self, "Успех", "Аккаунт успешно добавлен")
@@ -406,6 +415,76 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Ошибка при закрытии приложения: {str(e)}")
             event.accept()
 
+    def show_code_dialog(self):
+        """Показывает диалог для ввода кода подтверждения"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Подтверждение")
+        layout = QVBoxLayout()
+
+        # Поле для ввода кода
+        code_input = QLineEdit()
+        code_input.setPlaceholderText("Введите код из сообщения")
+        code_input.setStyleSheet(Styles.INPUT)
+
+        # Кнопки
+        buttons = QHBoxLayout()
+        ok_button = QPushButton("Подтвердить")
+        cancel_button = QPushButton("Отмена")
+        ok_button.setStyleSheet(Styles.BUTTON)
+        cancel_button.setStyleSheet(Styles.BUTTON)
+
+        buttons.addWidget(ok_button)
+        buttons.addWidget(cancel_button)
+
+        layout.addWidget(QLabel("Введите код, отправленный в Telegram:"))
+        layout.addWidget(code_input)
+        layout.addLayout(buttons)
+
+        dialog.setLayout(layout)
+
+        # Подключаем обработчики
+        ok_button.clicked.connect(lambda: dialog.done(1))
+        cancel_button.clicked.connect(lambda: dialog.done(0))
+
+        if dialog.exec():
+            return code_input.text()
+        return None
+
+    def show_2fa_dialog(self):
+        """Показывает диалог для ввода пароля двухфакторной аутентификации"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Двухфакторная аутентификация")
+        layout = QVBoxLayout()
+
+        # Поле для ввода пароля
+        password_input = QLineEdit()
+        password_input.setPlaceholderText("Введите пароль двухфакторной аутентификации")
+        password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        password_input.setStyleSheet(Styles.INPUT)
+
+        # Кнопки
+        buttons = QHBoxLayout()
+        ok_button = QPushButton("Подтвердить")
+        cancel_button = QPushButton("Отмена")
+        ok_button.setStyleSheet(Styles.BUTTON)
+        cancel_button.setStyleSheet(Styles.BUTTON)
+
+        buttons.addWidget(ok_button)
+        buttons.addWidget(cancel_button)
+
+        layout.addWidget(QLabel("Введите пароль двухфакторной аутентификации:"))
+        layout.addWidget(password_input)
+        layout.addLayout(buttons)
+
+        dialog.setLayout(layout)
+
+        # Подключаем обработчики
+        ok_button.clicked.connect(lambda: dialog.done(1))
+        cancel_button.clicked.connect(lambda: dialog.done(0))
+
+        if dialog.exec():
+            return password_input.text()
+        return None
 
 class InviteThread(QThread):
     """Поток для выполнения приглашений"""
