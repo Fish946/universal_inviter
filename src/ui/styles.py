@@ -26,16 +26,9 @@ class Styles:
             font-family: {Fonts.DEFAULT};
             font-size: {Fonts.SIZE_NORMAL};
         }}
-    """
-    # ... остальные стили ...
-
-class Styles:
-    MAIN_WINDOW = f"""
-        QMainWindow {{
-            background-color: {Colors.BACKGROUND};
-        }}
-        QLabel {{
-            color: {Colors.TEXT};
+        QWidget {{
+            font-family: {Fonts.DEFAULT};
+            font-size: {Fonts.SIZE_NORMAL};
         }}
     """
 
@@ -56,6 +49,7 @@ class Styles:
             color: white;
             border: none;
             border-radius: 4px;
+            min-height: 30px;
         }}
         QPushButton:hover {{
             background-color: #1976D2;

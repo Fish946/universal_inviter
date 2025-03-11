@@ -5,32 +5,48 @@ from typing import Dict, Optional
 
 @dataclass
 class Config:
-    db_path: str
-    logs_path: str
-    default_delays: Dict[str, int]
-    language: str = "ru"
-
+    """Конфигурация приложения"""
+    
+    def __init__(self):
+        self.db_path = "inviter.db"
+        self.sessions_dir = "sessions"
+        self.logs_dir = "logs"
+        
+        # Создаем необходимые директории
+        for directory in [self.sessions_dir, self.logs_dir]:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+    
     @classmethod
     def load(cls, config_path: str = "config.json") -> 'Config':
-        if not os.path.exists(config_path):
-            # Создаем конфиг по умолчанию
-            config = {
-                "db_path": "data/accounts.db",
-                "logs_path": "data/logs",
-                "language": "ru",
-                "default_delays": {
-                    "between_adds": 180,  # 3 минуты между добавлениями
-                    "error_delay": 60,    # 1 минута при ошибке
-                    "check_delay": 5      # 5 секунд между проверками
-                }
-            }
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
+        """Загрузка конфигурации из файла"""
+        config = cls()
         
-        with open(config_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return cls(**data)
-
-    def save(self, config_path: str = "config.json"):
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(self.__dict__, f, indent=4, ensure_ascii=False)
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                config.db_path = data.get('db_path', config.db_path)
+                config.sessions_dir = data.get('sessions_dir', config.sessions_dir)
+                config.logs_dir = data.get('logs_dir', config.logs_dir)
+                    
+            except Exception as e:
+                print(f"Ошибка при загрузке конфигурации: {str(e)}")
+                
+        return config
+        
+    def save(self, config_path: str = "config.json") -> None:
+        """Сохранение конфигурации в файл"""
+        try:
+            data = {
+                'db_path': self.db_path,
+                'sessions_dir': self.sessions_dir,
+                'logs_dir': self.logs_dir
+            }
+            
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+                
+        except Exception as e:
+            print(f"Ошибка при сохранении конфигурации: {str(e)}")
